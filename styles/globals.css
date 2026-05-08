@@ -1,0 +1,85 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* الألوان الفاتحة الافتراضية */
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  
+  /* --- إضافات تأثير الزجاج للوضع الفاتح --- */
+  --glass-bg: rgba(255, 255, 255, 0.1);
+  --glass-border: rgba(255, 255, 255, 0.2);
+  --glass-blur: 12px;
+
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --radius: 3rem; /* تعديل نصف القطر ليكون دائرياً كبيراً كما في الصورة */
+}
+
+.dark {
+  /* الألوان الغامقة (مطابقة للصورة تماماً) */
+  --background: oklch(0.12 0 0); /* أسود مائل للبني خفيف */
+  --foreground: oklch(0.985 0 0);
+  
+  /* --- إضافات تأثير الزجاج للوضع المظلم (image_bec394.jpg) --- */
+  --glass-bg: rgba(18, 18, 18, 0.7); /* لون غامق شفاف */
+  --glass-border: rgba(255, 255, 255, 0.05);
+  
+  --card: oklch(0.145 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.7 0.15 45); /* اللون الذهبي/البني للزر */
+  --primary-foreground: oklch(0.205 0 0);
+  --border: oklch(0.269 0 0);
+  --input: oklch(0.2 0 0);
+}
+
+@theme inline {
+  --font-sans: 'Geist', 'Geist Fallback';
+  /* تعريف متغيرات الزجاج لتستخدميها في الكلاسات مباشرة */
+  --color-glass: var(--glass-bg);
+  --color-glass-border: var(--glass-border);
+  
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-primary: var(--primary);
+  --radius-lg: var(--radius);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    /* تطبيق الخلفية السوداء */
+    @apply bg-background text-foreground antialiased;
+    background-image: url('/bg-contact.jpg'); /* تأكدي من وجود الصورة */
+    background-attachment: fixed;
+    background-size: cover;
+  }
+
+  /* كلاس جاهز يمكنك استخدامه لأي بطاقة تريدينها أن تصبح "زجاجية" */
+  .glass-effect {
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--glass-border);
+    @apply rounded-[3rem] shadow-2xl;
+  }
+}
