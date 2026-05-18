@@ -1,5 +1,5 @@
 // User Roles
-export type UserRole = 'patient' | 'doctor' | 'secretary' | 'admin';
+export type UserRole = 'patient' | 'doctor' | 'secretary' | 'admin' | 'guest';
 
 export interface User {
   id: string;
@@ -27,8 +27,9 @@ export interface Service {
   nameEn?: string;
   description: string;
   price: number;
-  duration: number;
-  department: Department;
+  duration: number | string;
+  department?: Department;
+  category: Department;
   image: string;
 }
 
@@ -51,18 +52,24 @@ export interface DoctorAvailability {
 
 export interface Appointment {
   id: string;
-  patientId: string;
-  patientName: string;
-  patientPhone: string;
+  patientId?: string;
+  patientName?: string;
+  patientPhone?: string;
+  name?: string;
+  customerName: string;
+  customerPhone: string;
   serviceId: string;
   serviceName: string;
-  doctorId: string;
-  doctorName: string;
+  packageName?: string;
+  doctorId?: string;
+  doctorName?: string;
   date: string;
   time: string;
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
-  paymentStatus: 'paid' | 'unpaid';
-  paymentMethod: 'electronic' | 'cash';
+  paymentStatus?: 'pending_review' | 'paid' | 'unpaid' | 'rejected';
+  paymentMethod?: 'bank' | 'sham_cash' | 'cash';
+  paymentReference?: string;
+  paymentNote?: string;
   patientNotes?: string; // Only visible to admin
   doctorReport?: string;
   createdAt: string;

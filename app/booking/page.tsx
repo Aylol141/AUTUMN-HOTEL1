@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Suspense, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { Header } from '@/components/header';
 import { Footer } from '@/components/footer';
 import { Button } from '@/components/ui/button';
@@ -17,18 +18,46 @@ const timeSlots = [
 function BookingForm() {
   const searchParams = useSearchParams();
   const roomIdFromUrl = searchParams.get('room'); 
+  const serviceIdFromUrl = searchParams.get('service');
   const products = useStore((state) => state.products) || [];
-  const addBooking = useStore((state) => state.addBooking);
+  const services = useStore((state) => state.services) || [];
+  const currentUser = useStore((state) => state.currentUser);
 
   const [step, setStep] = useState(1);
-  const [selectedRoom, setSelectedRoom] = useState<string>(roomIdFromUrl || '');
+  const [selectedItem, setSelectedItem] = useState<string>(roomIdFromUrl || serviceIdFromUrl || '');
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedTime, setSelectedTime] = useState<string>('');
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<'bank' | 'sham_cash'>('sham_cash');
+  const [paymentReference, setPaymentReference] = useState('');
+  const [paymentNote, setPaymentNote] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [bookingError, setBookingError] = useState('');
 
-  const selectedRoomData = useMemo(() => products.find((p) => p.id === selectedRoom), [products, selectedRoom]);
+  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const bookableItems = useMemo(
+    () => [
+      ...products.map((product) => ({ ...product, bookingType: 'room' as const })),
+      ...services.map((service) => ({
+        id: service.id,
+        name: service.name,
+        description: service.description,
+        price: service.price,
+        image: service.image,
+        category: service.category,
+        inStock: true,
+        bookingType: 'service' as const,
+      })),
+    ],
+    [products, services],
+  );
+
+  const selectedRoomData = useMemo(
+    () => bookableItems.find((item) => item.id === selectedItem),
+    [bookableItems, selectedItem],
+  );
 
   const handleAddToGoogleCalendar = () => {
     if (!selectedRoomData) return;
@@ -38,6 +67,59 @@ function BookingForm() {
     const startTime = `${dateFormatted}T100000Z`;
     const googleUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&details=${details}&dates=${startTime}/${startTime}`;
     window.open(googleUrl, '_blank');
+  };
+
+  const handleSubmitBooking = async () => {
+    if (!selectedRoomData || isSaving) return;
+
+    if (!currentUser) {
+      setBookingError('لازم تسجل دخول أو تنشئ حساب قبل تأكيد الحجز.');
+      return;
+    }
+
+    if (selectedDate < today) {
+      setBookingError('لا يمكن اختيار تاريخ قديم للحجز.');
+      setStep(2);
+      return;
+    }
+
+    setIsSaving(true);
+    setBookingError('');
+
+    try {
+      const response = await fetch('/api/bookings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          serviceId: selectedItem,
+          serviceName: selectedRoomData.name,
+          customerName: customerName || currentUser.name,
+          customerPhone: customerPhone || currentUser.phone,
+          date: selectedDate,
+          time: selectedTime,
+          price: selectedRoomData.price,
+          bookingType: selectedRoomData.bookingType,
+          userId: currentUser.id,
+          username: currentUser.username,
+          userRole: currentUser.role,
+          paymentMethod,
+          paymentReference,
+          paymentNote,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.error || 'Booking request failed');
+      }
+
+      setIsSubmitted(true);
+    } catch (error) {
+      console.error('Booking error:', error);
+      setBookingError(error instanceof Error ? error.message : 'تعذر حفظ الحجز، يرجى المحاولة مرة أخرى');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   if (isSubmitted && selectedRoomData) {
@@ -59,6 +141,20 @@ function BookingForm() {
 
   return (
     <div className="max-w-7xl mx-auto relative z-10 px-6">
+      {!currentUser && (
+        <div className="mb-10 rounded-[2rem] border border-[#dda15e]/30 bg-black/60 p-6 text-center text-white shadow-2xl">
+          <p className="mb-4 text-lg font-bold">الحجز متاح فقط للأعضاء المسجلين.</p>
+          <p className="mb-6 text-sm text-white/60">أنشئ حساب أو سجّل دخولك حتى نربط الحجز بحسابك وتقدر تلغيه لاحقاً من لوحة النزيل.</p>
+          <div className="flex flex-wrap justify-center gap-3">
+            <Link href="/register">
+              <Button className="rounded-full bg-[#dda15e] px-8 text-black hover:bg-white">إنشاء حساب</Button>
+            </Link>
+            <Link href="/">
+              <Button variant="ghost" className="rounded-full border border-white/20 px-8 text-white hover:bg-white/10">تسجيل الدخول</Button>
+            </Link>
+          </div>
+        </div>
+      )}
       <div className="grid lg:grid-cols-12 gap-12 items-center">
         
         {/* النافذة اليسرى مع الفيديو */}
@@ -91,17 +187,20 @@ function BookingForm() {
                   اختر <span style={{ fontFamily: 'AutumnFont' }} className="text-[#dda15e] italic">ملاذك</span>
                 </h2>
                 <div className="grid gap-5 max-h-[400px] overflow-y-auto pr-4 custom-scrollbar text-right">
-                {products.map((room) => (
-                    <div key={room.id} onClick={() => setSelectedRoom(room.id)}
+                {bookableItems.map((room) => (
+                    <div key={room.id} onClick={() => setSelectedItem(room.id)}
                     className={`p-7 rounded-[3rem] border-2 transition-all duration-500 cursor-pointer flex items-center justify-between gap-6 ${
-                        selectedRoom === room.id ? 'bg-white border-white text-black scale-[0.98]' : 'bg-black/40 border-white/10 text-white hover:border-white/30'
+                        selectedItem === room.id ? 'bg-white border-white text-black scale-[0.98]' : 'bg-black/40 border-white/10 text-white hover:border-white/30'
                     }`}>
-                        <span className={`font-black text-xl tracking-tight ${selectedRoom === room.id ? 'text-black' : 'text-[#dda15e]'}`}>{room.price} $</span>
-                        <h3 style={{ fontFamily: 'AutumnFont' }} className="font-bold text-2xl">{room.name}</h3>
+                        <span className={`font-black text-xl tracking-tight ${selectedItem === room.id ? 'text-black' : 'text-[#dda15e]'}`}>{room.price} $</span>
+                        <div className="text-right">
+                          <h3 style={{ fontFamily: 'AutumnFont' }} className="font-bold text-2xl">{room.name}</h3>
+                          <p className="mt-1 text-xs opacity-60">{room.bookingType === 'room' ? 'غرفة / جناح' : 'خدمة فندقية'}</p>
+                        </div>
                     </div>
                 ))}
                 </div>
-                <Button onClick={() => setStep(2)} disabled={!selectedRoom} className="w-full mt-12 h-20 rounded-full bg-[#dda15e] text-white hover:bg-white hover:text-black font-black text-2xl shadow-2xl transition-all active:scale-95 uppercase tracking-widest">تحديد الموعد</Button>
+                <Button onClick={() => setStep(2)} disabled={!selectedItem || !currentUser} className="w-full mt-12 h-20 rounded-full bg-[#dda15e] text-white hover:bg-white hover:text-black font-black text-2xl shadow-2xl transition-all active:scale-95 uppercase tracking-widest">تحديد الموعد</Button>
             </div>
             )}
 
@@ -112,7 +211,7 @@ function BookingForm() {
                 </h2>
                 <div className="space-y-10">
                     <div className="relative">
-                        <Input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} 
+                        <Input type="date" min={today} value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} 
                         className="bg-black/40 border-white/10 h-20 rounded-[2.5rem] text-white text-right text-2xl font-bold focus:border-[#dda15e] transition-all px-10" />
                     </div>
                     {selectedDate && (
@@ -136,15 +235,66 @@ function BookingForm() {
                   بصمتك <span style={{ fontFamily: 'AutumnFont' }} className="text-[#dda15e]">الأخيرة</span>
                 </h2>
                 <div className="space-y-8">
-                    <Input placeholder="الاسم الكامل" value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="bg-black/40 border-white/10 h-20 rounded-[2.5rem] text-white text-right text-2xl font-bold px-10 focus:border-[#dda15e]" />
-                    <Input placeholder="رقم الجوال" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} dir="ltr" className="bg-black/40 border-white/10 h-20 rounded-[2.5rem] text-white text-right text-2xl font-bold px-10 focus:border-[#dda15e]" />
+                    <Input placeholder="الاسم الكامل" value={customerName || currentUser?.name || ''} onChange={(e) => setCustomerName(e.target.value)} className="bg-black/40 border-white/10 h-20 rounded-[2.5rem] text-white text-right text-2xl font-bold px-10 focus:border-[#dda15e]" />
+                    <Input placeholder="رقم الجوال" value={customerPhone || currentUser?.phone || ''} onChange={(e) => setCustomerPhone(e.target.value)} dir="ltr" className="bg-black/40 border-white/10 h-20 rounded-[2.5rem] text-white text-right text-2xl font-bold px-10 focus:border-[#dda15e]" />
+                    <div className="rounded-[2rem] border border-white/10 bg-black/30 p-5">
+                      <p className="mb-4 text-sm font-black text-[#dda15e]">طريقة الدفع</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        {[
+                          { id: 'sham_cash', label: 'شام كاش' },
+                          { id: 'bank', label: 'تحويل بنكي' },
+                        ].map((method) => (
+                          <button
+                            key={method.id}
+                            type="button"
+                            onClick={() => setPaymentMethod(method.id as 'bank' | 'sham_cash')}
+                            className={`h-14 rounded-2xl border text-sm font-black transition ${
+                              paymentMethod === method.id
+                                ? 'border-[#dda15e] bg-[#dda15e] text-black'
+                                : 'border-white/10 bg-white/5 text-white hover:border-white/30'
+                            }`}
+                          >
+                            {method.label}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="mt-5 rounded-2xl bg-white/5 p-4 text-sm leading-7 text-white/75">
+                        {paymentMethod === 'sham_cash' ? (
+                          <>
+                            حوّل المبلغ إلى شام كاش على الرقم: <span dir="ltr" className="font-black text-white">0999 000 000</span>
+                          </>
+                        ) : (
+                          <>
+                            التحويل البنكي إلى حساب Autumn Hotel، رقم الحساب: <span dir="ltr" className="font-black text-white">SY-AUTUMN-2026</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <Input
+                      placeholder="رقم عملية الدفع أو رقم الإشعار"
+                      value={paymentReference}
+                      onChange={(e) => setPaymentReference(e.target.value)}
+                      dir="ltr"
+                      className="bg-black/40 border-white/10 h-20 rounded-[2.5rem] text-white text-left text-2xl font-bold px-10 focus:border-[#dda15e]"
+                    />
+                    <Input
+                      placeholder="ملاحظة اختيارية عن الدفع"
+                      value={paymentNote}
+                      onChange={(e) => setPaymentNote(e.target.value)}
+                      className="bg-black/40 border-white/10 h-16 rounded-[2rem] text-white text-right text-lg font-bold px-10 focus:border-[#dda15e]"
+                    />
                 </div>
                 <div className="mt-16 flex gap-5">
                     <Button variant="ghost" onClick={() => setStep(2)} className="h-20 w-24 rounded-full bg-white/5 text-white hover:bg-white/10 flex items-center justify-center border border-white/5"><ArrowRight size={28} /></Button>
-                    <Button onClick={() => { addBooking({ serviceId: selectedRoom, serviceName: selectedRoomData?.name || '', customerName, customerPhone, date: selectedDate, time: selectedTime }); setIsSubmitted(true); }} 
-                            disabled={!customerName || !customerPhone} 
-                            className="flex-1 h-20 rounded-full bg-white text-black hover:bg-[#dda15e] hover:text-white font-black text-2xl shadow-[0_20px_60px_rgba(255,255,255,0.1)] transition-all duration-700">تأكيد الحجز الملكي</Button>
+                    <Button onClick={handleSubmitBooking} 
+                            disabled={!currentUser || !paymentReference || isSaving} 
+                            className="flex-1 h-20 rounded-full bg-white text-black hover:bg-[#dda15e] hover:text-white font-black text-2xl shadow-[0_20px_60px_rgba(255,255,255,0.1)] transition-all duration-700">
+                      {isSaving ? 'جاري حفظ الحجز...' : 'تأكيد الحجز الملكي'}
+                    </Button>
                 </div>
+                {bookingError && (
+                  <p className="mt-5 text-center text-sm font-bold text-red-300">{bookingError}</p>
+                )}
             </div>
             )}
         </div>

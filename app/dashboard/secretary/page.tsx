@@ -1,5 +1,4 @@
 'use client';
-import { useStore } from '../../../lib/store';
 import { 
   CalendarDays, 
   Clock, 
@@ -11,11 +10,49 @@ import {
   BellRing,
   Coffee
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import type { Appointment } from '@/lib/types';
 
 export default function SecretaryPage() {
-  const { appointments, updateBookingStatus } = useStore();
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('pending');
+
+  useEffect(() => {
+    fetch('/api/bookings', { cache: 'no-store' })
+      .then((response) => response.json())
+      .then((data) => setAppointments(data))
+      .catch((error) => console.error('Failed to load bookings:', error))
+      .finally(() => setIsLoading(false));
+  }, []);
+
+  const updateBookingStatus = async (id: string, status: Appointment['status']) => {
+    const response = await fetch(`/api/bookings/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+
+    if (response.ok) {
+      setAppointments((current) => current.map((appointment) => (
+        appointment.id === id ? { ...appointment, status } : appointment
+      )));
+    }
+  };
+
+  const markPaymentPaid = async (id: string) => {
+    const response = await fetch(`/api/bookings/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paymentStatus: 'paid' }),
+    });
+
+    if (response.ok) {
+      setAppointments((current) => current.map((appointment) => (
+        appointment.id === id ? { ...appointment, paymentStatus: 'paid' } : appointment
+      )));
+    }
+  };
 
   const filtered = appointments.filter(app => app.status === activeTab);
 
@@ -56,7 +93,11 @@ export default function SecretaryPage() {
 
       {/* Grid Content - نظام الكروت الشبكي */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {filtered.length === 0 ? (
+        {isLoading ? (
+          <div className="col-span-full py-20 flex flex-col items-center justify-center text-stone-400">
+            <p className="font-medium">جاري تحميل الحجوزات...</p>
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="col-span-full py-20 flex flex-col items-center justify-center text-stone-300">
             <Coffee size={48} strokeWidth={1} />
             <p className="mt-4 font-medium text-stone-400">لا يوجد مهام في هذا القسم حالياً.. وقت القهوة؟</p>
@@ -101,6 +142,15 @@ export default function SecretaryPage() {
                       قسم الرفاهية
                     </div>
                   </div>
+                  <div className="rounded-2xl bg-stone-50 p-4 text-xs text-stone-600">
+                    <div className="font-black text-stone-900">
+                      الدفع: {app.paymentMethod === 'bank' ? 'تحويل بنكي' : app.paymentMethod === 'sham_cash' ? 'شام كاش' : 'نقداً'}
+                    </div>
+                    <div dir="ltr">رقم العملية: {app.paymentReference || '-'}</div>
+                    <div>
+                      الحالة: {app.paymentStatus === 'paid' ? 'مدفوع' : app.paymentStatus === 'rejected' ? 'مرفوض' : 'بانتظار المراجعة'}
+                    </div>
+                  </div>
 
                   {/* Actions - أزرار تفاعلية ضخمة وسهلة */}
                   {activeTab === 'pending' && (
@@ -110,6 +160,12 @@ export default function SecretaryPage() {
                         className="bg-stone-900 text-white py-4 rounded-2xl text-xs font-bold hover:bg-green-700 transition-all flex items-center justify-center gap-2"
                       >
                         <Check size={16} /> تأكيد
+                      </button>
+                      <button
+                        onClick={() => markPaymentPaid(app.id)}
+                        className="bg-emerald-50 text-emerald-700 py-4 rounded-2xl text-xs font-bold hover:bg-emerald-100 transition-all"
+                      >
+                        الدفع مدفوع
                       </button>
                       <button 
                         onClick={() => updateBookingStatus(app.id, 'cancelled')}

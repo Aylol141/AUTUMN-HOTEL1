@@ -2,20 +2,19 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Menu, UserCircle } from 'lucide-react'; // حذفنا ShoppingBag
+import { Menu, UserCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+// تأكدي من أن هذه المسارات مطابقة لمجلد الـ UI عندك
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
-import { useStore } from '@/lib/store';
 import { LoginForm } from '@/components/auth/login-form';
 
-// التعديل هنا فقط في الروابط (تغيير اسم التبويب)
 const navLinks = [
   { href: '/', label: 'الرئيسية' },
   { href: '/services', label: 'عن الفندق' },
   { href: '/products', label: 'الأجنحة والغرف' },
   { href: '/booking', label: 'الحجوزات' },
-  { href: '/discover', label: 'لماذا Autumn؟' }, // التبويب الجديد مكان "تواصل معنا"
+  { href: '/discover', label: 'لماذا Autumn؟' },
 ];
 
 export function Header() {
@@ -25,7 +24,7 @@ export function Header() {
     <header className="fixed top-0 z-[100] w-full border-b border-white/5 bg-black/20 backdrop-blur-md">
       <div className="container mx-auto flex h-20 items-center justify-between px-6">
         
-        {/* جهة اليسار: تسجيل الدخول فقط (بعد حذف السلة) */}
+        {/* جهة اليسار: تسجيل الدخول */}
         <div className="flex items-center gap-6 order-first">
           <Dialog>
             <DialogTrigger asChild>
@@ -41,10 +40,9 @@ export function Header() {
                 <LoginForm />
             </DialogContent>
           </Dialog>
-          {/* تم حذف كود السلة من هنا تماماً */}
         </div>
 
-        {/* روابط التنقل (الوسط) - نفس ترتيبك الأصلي مع تنسيق أرقى */}
+        {/* روابط التنقل (الوسط) */}
         <nav className="hidden md:flex items-center gap-10">
           {navLinks.map((link) => (
             <Link
@@ -58,7 +56,7 @@ export function Header() {
           ))}
         </nav>
 
-        {/* اللوجو (اليمين) - حافظنا على مكانه وترتيبه */}
+        {/* اللوجو (اليمين) */}
         <Link href="/" className="flex items-center gap-4 order-last group">
           <div className="text-right">
             <span style={{ fontFamily: 'AutumnFont' }} className="block text-xl font-bold text-white tracking-tighter leading-none group-hover:text-[#dda15e] transition-colors">
@@ -72,10 +70,10 @@ export function Header() {
           </div>
         </Link>
 
-        {/* الموبايل منيو - نفس المنطق الأصلي */}
+        {/* الموبايل منيو */}
         <Sheet open={isOpen} onOpenChange={setIsOpen}>
           <SheetTrigger asChild className="md:hidden">
-            <Button variant="ghost" size="icon" className="text-white">
+            <Button variant="ghost" size="icon" className="text-white hover:bg-white/10">
               <Menu className="h-6 w-6" />
             </Button>
           </SheetTrigger>
@@ -97,11 +95,11 @@ export function Header() {
               
               <Dialog>
                 <DialogTrigger asChild>
-                  <Button variant="outline" className="border-[#bc6c25] text-[#dda15e] hover:bg-[#bc6c25] hover:text-white rounded-none px-10">
+                  <Button variant="outline" className="border-[#bc6c25] text-[#dda15e] hover:bg-[#bc6c25] hover:text-white rounded-none px-10 bg-transparent">
                     تسجيل الدخول
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="p-0 border-none bg-transparent shadow-none">
+                <DialogContent className="p-0 border-none bg-transparent shadow-none max-w-[90vw] sm:max-w-[450px]">
                   <LoginForm />
                 </DialogContent>
               </Dialog>

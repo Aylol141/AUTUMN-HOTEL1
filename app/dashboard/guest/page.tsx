@@ -1,6 +1,7 @@
 'use client';
 import { useStore } from '../../../lib/store';
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { 
   Sparkles, 
   MapPin, 
@@ -11,10 +12,52 @@ import {
   ChevronRight,
   BedDouble
 } from 'lucide-react';
+import type { Appointment } from '@/lib/types';
 
 export default function GuestDashboard() {
   const { currentUser } = useStore();
   const router = useRouter();
+  const [bookings, setBookings] = useState<Appointment[]>([]);
+  const [loadingBookings, setLoadingBookings] = useState(false);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!currentUser?.id) return;
+
+    setLoadingBookings(true);
+    fetch(`/api/bookings?userId=${encodeURIComponent(currentUser.id)}`, { cache: 'no-store' })
+      .then((response) => response.json())
+      .then((data) => setBookings(Array.isArray(data) ? data : []))
+      .catch(() => setBookings([]))
+      .finally(() => setLoadingBookings(false));
+  }, [currentUser?.id]);
+
+  const cancelBooking = async (bookingId: string) => {
+    if (!currentUser?.id || cancellingId) return;
+
+    setCancellingId(bookingId);
+
+    try {
+      const response = await fetch(`/api/bookings/${bookingId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': currentUser.id,
+        },
+        body: JSON.stringify({ status: 'cancelled' }),
+      });
+
+      if (!response.ok) throw new Error('Cancel failed');
+
+      setBookings((current) =>
+        current.map((booking) =>
+          booking.id === bookingId ? { ...booking, status: 'cancelled' } : booking,
+        ),
+      );
+    } finally {
+      setCancellingId(null);
+    }
+  };
 
   return (
     <div className="min-h-screen pb-20" dir="rtl">
@@ -109,18 +152,63 @@ export default function GuestDashboard() {
         <div className="space-y-6">
           <div className="bg-white rounded-[2.5rem] p-8 border border-stone-100 shadow-sm">
             <h3 className="text-xl font-black text-stone-900 mb-6 border-b border-stone-50 pb-4">مواعيدك</h3>
-            <div className="py-10 text-center">
-              <div className="w-16 h-16 bg-stone-50 rounded-full flex items-center justify-center mx-auto mb-4 text-stone-300">
-                <Clock size={30} />
+            {loadingBookings ? (
+              <div className="py-10 text-center text-stone-400 text-sm font-medium">جاري تحميل حجوزاتك...</div>
+            ) : bookings.length > 0 ? (
+              <div className="space-y-4">
+                {bookings.map((booking) => (
+                  <div key={booking.id} className="rounded-3xl border border-stone-100 bg-stone-50 p-5">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <span className={`rounded-full px-3 py-1 text-[10px] font-black ${
+                        booking.status === 'cancelled'
+                          ? 'bg-red-100 text-red-700'
+                          : booking.status === 'confirmed'
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : 'bg-amber-100 text-amber-700'
+                      }`}>
+                        {booking.status === 'cancelled' ? 'ملغي' : booking.status === 'confirmed' ? 'مؤكد' : 'قيد المراجعة'}
+                      </span>
+                      <h4 className="text-sm font-black text-stone-900">{booking.serviceName}</h4>
+                    </div>
+                    <div className="mb-4 grid grid-cols-2 gap-2 text-xs text-stone-500">
+                      <span>{booking.time}</span>
+                      <span>{booking.date}</span>
+                    </div>
+                    <div className="mb-4 rounded-2xl bg-white p-3 text-xs text-stone-600">
+                      <div className="mb-1 font-black text-stone-900">
+                        الدفع: {booking.paymentMethod === 'bank' ? 'تحويل بنكي' : booking.paymentMethod === 'sham_cash' ? 'شام كاش' : 'نقداً'}
+                      </div>
+                      <div>رقم العملية: <span dir="ltr">{booking.paymentReference || 'غير مسجل'}</span></div>
+                      <div className="mt-1">
+                        الحالة: {booking.paymentStatus === 'paid' ? 'مدفوع' : booking.paymentStatus === 'rejected' ? 'مرفوض' : 'بانتظار مراجعة الدفع'}
+                      </div>
+                    </div>
+                    {booking.status !== 'cancelled' && booking.status !== 'completed' && (
+                      <button
+                        onClick={() => cancelBooking(booking.id)}
+                        disabled={cancellingId === booking.id}
+                        className="w-full rounded-2xl border border-red-200 bg-white px-4 py-3 text-xs font-black text-red-600 transition hover:bg-red-50 disabled:opacity-60"
+                      >
+                        {cancellingId === booking.id ? 'جاري إلغاء الحجز...' : 'إلغاء الحجز'}
+                      </button>
+                    )}
+                  </div>
+                ))}
               </div>
-              <p className="text-stone-400 text-sm font-medium">لا توجد حجوزات نشطة حالياً</p>
-              <button 
-                onClick={() => router.push('/')}
-                className="mt-6 text-amber-600 text-xs font-bold underline underline-offset-4"
-              >
-                ابدأ رحلتك واحجز الآن
-              </button>
-            </div>
+            ) : (
+              <div className="py-10 text-center">
+                <div className="w-16 h-16 bg-stone-50 rounded-full flex items-center justify-center mx-auto mb-4 text-stone-300">
+                  <Clock size={30} />
+                </div>
+                <p className="text-stone-400 text-sm font-medium">لا توجد حجوزات نشطة حالياً</p>
+                <button 
+                  onClick={() => router.push('/products')}
+                  className="mt-6 text-amber-600 text-xs font-bold underline underline-offset-4"
+                >
+                  ابدأ رحلتك واحجز الآن
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

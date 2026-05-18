@@ -1,0 +1,82 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String    @id @default(cuid())
+  username  String    @unique
+  email     String?   @unique
+  name      String
+  phone     String?
+  password  String
+  role      String    @default("guest")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  bookings  Booking[]
+}
+
+model Room {
+  id          String    @id @default(cuid())
+  number      String    @unique
+  name        String
+  type        String
+  price       Float
+  description String?
+  image       String?
+  status      String    @default("available")
+  bookings    Booking[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Booking {
+  id            String   @id @default(cuid())
+  customerName  String
+  customerPhone String
+  serviceName   String
+  date          String
+  time          String
+  checkIn       DateTime
+  checkOut      DateTime
+  status        String   @default("pending")
+  paymentMethod String   @default("cash")
+  paymentStatus String   @default("pending_review")
+  paymentReference String?
+  paymentNote   String?
+  totalPrice    Float
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  roomId        String
+  room          Room     @relation(fields: [roomId], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Service {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  nameEn      String?
+  description String?
+  price       Float
+  duration    Int      @default(60)
+  department  String   @default("hotel")
+  image       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  name      String
+  email     String?
+  phone     String?
+  subject   String?
+  content   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}

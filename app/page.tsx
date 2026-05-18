@@ -9,17 +9,31 @@ import { CTASection } from '@/components/home/cta-section';
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-white">
+      {/* 1. الهيدر */}
       <Header />
+      
       <main className="flex-1">
+        {/* 2. قسم الهيرو (الفيديو) */}
         <HeroSection />
+        
+        {/* 3. من نحن */}
         <AboutSection />
+        
+        {/* 4. الخدمات والغرف */}
         <ServicesSection />
+        
+        {/* 5. آراء العملاء */}
         <TestimonialsSection />
+        
+        {/* 6. دعوة للحجز */}
         <CTASection />
       </main>
+
+     
+
+      {/* 8. الفوتر */}
       <Footer />
-      
     </div>
   );
 }
